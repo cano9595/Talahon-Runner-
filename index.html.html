@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8" />
+    <title>Talahon Runner – Level 4</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+        html, body {
+            margin: 0; padding: 0; background: #111; overflow: hidden;
+            height: 100%;
+        }
+        canvas {
+            display: block; margin: 0 auto; background: linear-gradient(to top, #222, #444);
+            touch-action: none;
+        }
+        #score {
+            position: absolute; top: 10px; left: 50%;
+            transform: translateX(-50%);
+            font-family: Arial, sans-serif; font-size: 20px; color: white;
+            background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 10px;
+            user-select: none;
+            z-index: 5;
+        }
+        #flirtBox {
+            position: absolute;
+            top: 40%;
+            left: 10%;
+            width: 80%;
+            background: #222;
+            color: #fff;
+            font-family: sans-serif;
+            border: 2px solid #fff;
+            border-radius: 10px;
+            padding: 10px;
+            display: none;
+            z-index: 10;
+            user-select: none;
+        }
+        #flirtBox button {
+            margin: 5px;
+            padding: 10px;
+            width: 90%;
+            font-size: 16px;
+            background: #333;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            user-select: none;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="game" width="400" height="600"></canvas>
+    <div id="score">💶 0 €</div>
+    <div id="flirtBox">
+        <p>Sie antwortet: "Hey du siehst süß aus 😘"<br />Was willst du sagen?</p>
+        <button onclick="flirtResponse(0)">Was geht?</button>
+        <button onclick="flirtResponse(1)">Komm ins Auto</button>
+        <button onclick="flirtResponse(2)">Ich hol dich morgen ab</button>
+    </div>
+
+<script>
+(() => {
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+    ctx.font = "24px Arial";
+
+    const lanes = [75, 175, 275];
+
+    let data = JSON.parse(localStorage.getItem("talahonRunner")) || {
+        score: 0,
+        gotNumber: false,
+        level: 1,
+        car: "none",
+        girl: "none"
+    };
+
+    let talahon = {
+        lane: 1,
+        x: lanes[1],
+        y: 500,
+        width: 50,
+        height: 50,
+        color: "#00FF88",
+    };
+
+    let money = [];
+
+    let withGirl = data.girl === "standard";
+
+    function saveGame() {
+        localStorage.setItem("talahonRunner", JSON.stringify(data));
+    }
+
+    function spawnMoney() {
+        const lane = Math.floor(Math.random() * 3);
+        money.push({ x: lanes[lane], y: -50, width: 30, height: 30 });
+    }
+
+    function drawTalahon() {
+        if (data.level >= 4) {
+            ctx.fillStyle = "#000";
+            ctx.fillRect(talahon.x - 10, talahon.y, 70, 40);
+            ctx.fillStyle = "#fff";
+            ctx.fillText("🚙", talahon.x + 10, talahon.y + 30);
+            if (withGirl) {
+                ctx.fillText("👩", talahon.x + 35, talahon.y + 30);
+            }
+        } else {
+            ctx.fillStyle = talahon.color;
+            ctx.fillRect(talahon.x, talahon.y, talahon.width, talahon.height);
+            ctx.fillStyle = "#000";
+            ctx.fillText("🧢", talahon.x + 10, talahon.y + 30);
+        }
+    }
+
+    function drawMoney() {
+        ctx.fillStyle = "#33FF00";
+        money.forEach(m => {
+            ctx.fillRect(m.x, m.y, m.width, m.height);
+            ctx.fillStyle = "#000";
+            ctx.fillText("💶", m.x + 5, m.y + 20);
+            ctx.fillStyle = "#33FF00";
+        });
+    }
+
+    function update() {
+        money.forEach(m => m.y += 4);
+
+        for (let i = money.length - 1; i >= 0; i--) {
+            let m = money[i];
+            if (
+                m.x < talahon.x + talahon.width &&
+                m.x + m.width > talahon.x &&
+                m.y < talahon.y + talahon.height &&
+                m.y + m.height > talahon.y
+            ) {
+                data.score += 100;
+                money.splice(i, 1);
+                document.getElementById("score").innerHTML = `💶 ${data.score} €`;
+                if (data.score >= 1000 && !data.gotNumber) {
+                    data.gotNumber = true;
+                    document.getElementById("flirtBox").style.display = "block";
+                }
+            }
+        }
+
+        money = money.filter(m => m.y < canvas.height + 50);
+
+        if (data.gotNumber && data.level < 4) {
+            data.level = 4;
+        }
+
+        saveGame();
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawTalahon();
+        drawMoney();
+    }
+
+    function gameLoop() {
+        update();
+        draw();
+        requestAnimationFrame(gameLoop);
+    }
+
+    window.flirtResponse = function(option) {
+        const box = document.getElementById("flirtBox");
+        if (option === 1) {
+            withGirl = true;
+            data.girl = "standard";
+            data.car = "gklasse";
+            box.innerHTML = "<p>Sie steigt ein! 🚗❤️</p>";
+        } else {
+            withGirl = false;
+            box.innerHTML = "<p>Sie schreibt: 'Hmm… vielleicht später 😅'</p>";
+        }
+        setTimeout(() => {
+            box.style.display = "none";
+        }, 2000);
+        saveGame();
+    };
+
+    setInterval(spawnMoney, 1000);
+
+    let startX = null;
+    canvas.addEventListener("touchstart", e => {
+        startX = e.touches[0].clientX;
+    });
+
+    canvas.addEventListener("touchend", e => {
+        const endX = e.changedTouches[0].clientX;
+        const diff = endX - startX;
+        if (diff > 30 && talahon.lane < 2) {
+            talahon.lane++;
+        } else if (diff < -30 && talahon.lane > 0) {
+            talahon.lane--;
+        }
+        talahon.x = lanes[talahon.lane];
+    });
+
+    gameLoop();
+
+})();
+</script>
+</body>
+</html>
